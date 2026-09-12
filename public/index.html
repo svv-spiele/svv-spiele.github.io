@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SV Vorgebirge – Spielplan</title>
+<meta name="description" content="Alle anstehenden Spiele des SV Vorgebirge 23/25/56 e.V. – Daten von fussball.de">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --text: #1a1d21;
+    --muted: #5f6b7a;
+    --line: #e1e5ea;
+    --accent: #0f6b3f;
+    --accent-soft: #e2f3ea;
+    --home: #0f6b3f;
+    --away: #8a5a00;
+    --away-soft: #fff3d6;
+    --warn: #b23a3a;
+    --warn-soft: #fbe5e5;
+    --radius: 10px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101418;
+      --card: #1a2027;
+      --text: #e8ecf0;
+      --muted: #9aa6b3;
+      --line: #2a323c;
+      --accent: #4fc38a;
+      --accent-soft: #143324;
+      --home: #4fc38a;
+      --away: #f0b64a;
+      --away-soft: #3a2e12;
+      --warn: #ff7b7b;
+      --warn-soft: #3c1d1d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+
+  header {
+    background: var(--accent);
+    color: #fff;
+    padding: 18px 16px 14px;
+  }
+  header .wrap { max-width: 960px; margin: 0 auto; }
+  header h1 { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: .01em; }
+  header p { margin: 4px 0 0; font-size: .85rem; opacity: .9; }
+  header a { color: #fff; }
+
+  main { max-width: 960px; margin: 0 auto; padding: 14px 12px 60px; }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  @media (min-width: 640px) {
+    .toolbar { grid-template-columns: 2fr 1.2fr 1.2fr; }
+  }
+  .toolbar input, .toolbar select {
+    width: 100%;
+    font: inherit;
+    font-size: .95rem;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+  }
+  .toolbar input:focus, .toolbar select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--card);
+  }
+  .segmented button {
+    font: inherit;
+    font-size: .85rem;
+    padding: 7px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .segmented button + button { border-left: 1px solid var(--line); }
+  .segmented button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+    justify-content: space-between;
+    font-size: .82rem;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .meta .links { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .day { margin: 18px 0 8px; }
+  .day h2 {
+    font-size: .95rem;
+    margin: 0 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .day h2 .rel { font-weight: 500; color: var(--accent); font-size: .8rem; }
+
+  .game {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    gap: 10px;
+  }
+  .game.prelim { border-style: dashed; }
+  .time { font-weight: 700; font-size: 1.05rem; padding-top: 2px; }
+  .time small { display: block; font-weight: 400; font-size: .7rem; color: var(--muted); }
+  .teams { font-weight: 600; font-size: 1rem; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .teams .own { color: var(--accent); }
+  .teams .sep { color: var(--muted); font-weight: 400; }
+  .badge {
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--home);
+  }
+  .badge.away { background: var(--away-soft); color: var(--away); }
+  .badge.prelim { background: var(--warn-soft); color: var(--warn); }
+  .info { font-size: .82rem; color: var(--muted); margin-top: 3px; }
+  .info a { color: var(--muted); text-decoration: none; }
+  .info a:hover { text-decoration: underline; color: var(--accent); }
+  .venue { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+  .venue a { color: inherit; text-decoration: none; }
+  .venue a:hover { text-decoration: underline; }
+
+  .empty, .error {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 10px;
+  }
+  .error { color: var(--warn); }
+
+  footer {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 10px 12px 30px;
+    font-size: .75rem;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>⚽ SV Vorgebirge – Spielplan</h1>
+    <p>Alle anstehenden Spiele des <a id="club-link" href="https://www.fussball.de/verein/-/id/00ES8GN914000083VV0AG08LVUPGND5I" target="_blank" rel="noopener">SV Vorgebirge 23/25/56 e.V.</a> · Daten von fussball.de</p>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Suche: Gegner, Wettbewerb, Spielort …" autocomplete="off">
+    <select id="team"><option value="">Alle Mannschaften</option></select>
+    <select id="range">
+      <option value="7">Nächste 7 Tage</option>
+      <option value="14">Nächste 14 Tage</option>
+      <option value="30">Nächste 30 Tage</option>
+      <option value="all" selected>Alle Spiele</option>
+    </select>
+  </div>
+
+  <div class="meta">
+    <div class="segmented" role="group" aria-label="Heim/Auswärts">
+      <button data-ha="" aria-pressed="true">Alle</button>
+      <button data-ha="home" aria-pressed="false">Heim</button>
+      <button data-ha="away" aria-pressed="false">Auswärts</button>
+    </div>
+    <div class="links">
+      <span id="count"></span>
+      <a id="ics" href="games.ics" download>📅 Kalender (ICS)</a>
+      <a id="webcal" href="#">Abonnieren</a>
+      <a href="games.json">JSON</a>
+    </div>
+  </div>
+
+  <div id="list"><div class="empty">Lade Spiele …</div></div>
+</main>
+
+<footer>
+  <span id="updated"></span> · Quelle: <a href="https://www.fussball.de" target="_blank" rel="noopener">fussball.de</a> · Angaben ohne Gewähr. Vorläufige Spiele sind gestrichelt markiert.
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const list = $('#list');
+  const state = { q: '', team: '', ha: '', range: 'all' };
+  let games = [];
+  let clubName = 'SV Vorgebirge';
+
+  const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+  function todayIso() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+  }
+  function addDays(iso, n) {
+    const d = new Date(iso + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function fmtDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return `${WEEKDAYS[dt.getUTCDay()]}, ${d}. ${MONTHS[m - 1]} ${y}`;
+  }
+  function relDay(iso) {
+    const t = todayIso();
+    if (iso === t) return 'Heute';
+    if (iso === addDays(t, 1)) return 'Morgen';
+    const diff = Math.round((new Date(iso) - new Date(t)) / 86400000);
+    if (diff > 1 && diff < 7) return `in ${diff} Tagen`;
+    return '';
+  }
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function mapsUrl(venue) {
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(venue);
+  }
+
+  function teamHtml(t, own) {
+    if (!t) return '<span>?</span>';
+    const cls = own ? ' class="own"' : '';
+    return t.url
+      ? `<a${cls} href="${esc(t.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">${esc(t.name)}</a>`
+      : `<span${cls}>${esc(t.name)}</span>`;
+  }
+
+  function gameHtml(g) {
+    const homeOwn = g.isHome === true;
+    const awayOwn = g.isHome === false;
+    const badge = g.isHome === null ? '' : homeOwn
+      ? '<span class="badge">Heim</span>'
+      : '<span class="badge away">Auswärts</span>';
+    const prelim = g.preliminary ? '<span class="badge prelim">vorläufig</span>' : '';
+    const info = [esc(g.ageGroup), esc(g.competition)].filter(Boolean).join(' · ');
+    const link = g.gameUrl ? ` · <a href="${esc(g.gameUrl)}" target="_blank" rel="noopener">Spiel auf fussball.de ↗</a>` : '';
+    const venue = g.venue ? `<div class="venue">📍 <a href="${mapsUrl(g.venue)}" target="_blank" rel="noopener">${esc(g.venue)}</a></div>` : '';
+    return `
+      <div class="game${g.preliminary ? ' prelim' : ''}">
+        <div class="time">${esc(g.time)}<small>Uhr</small></div>
+        <div>
+          <div class="teams">
+            ${teamHtml(g.home, homeOwn)}
+            <span class="sep">:</span>
+            ${teamHtml(g.away, awayOwn)}
+            ${badge}${prelim}
+          </div>
+          <div class="info">${info}${link}</div>
+          ${venue}
+        </div>
+      </div>`;
+  }
+
+  function filtered() {
+    const q = state.q.trim().toLowerCase();
+    const today = todayIso();
+    const until = state.range === 'all' ? null : addDays(today, Number(state.range));
+    return games.filter((g) => {
+      if (g.date < today) return false;
+      if (until && g.date > until) return false;
+      if (state.team && g.ownTeam !== state.team) return false;
+      if (state.ha === 'home' && g.isHome !== true) return false;
+      if (state.ha === 'away' && g.isHome !== false) return false;
+      if (q) {
+        const hay = [g.home?.name, g.away?.name, g.ageGroup, g.competition, g.venue, g.ownTeam].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function render() {
+    const rows = filtered();
+    $('#count').textContent = `${rows.length} Spiel${rows.length === 1 ? '' : 'e'}`;
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">Keine Spiele gefunden.</div>';
+      return;
+    }
+    const byDay = new Map();
+    for (const g of rows) {
+      if (!byDay.has(g.date)) byDay.set(g.date, []);
+      byDay.get(g.date).push(g);
+    }
+    let html = '';
+    for (const [date, gs] of byDay) {
+      const rel = relDay(date);
+      html += `<section class="day"><h2><span>${fmtDate(date)}</span>${rel ? `<span class="rel">${rel}</span>` : ''}</h2>`;
+      html += gs.map(gameHtml).join('');
+      html += '</section>';
+    }
+    list.innerHTML = html;
+  }
+
+  function sortTeams(names) {
+    // Senior teams first (I, II, III …), then youth by age descending, then the rest.
+    const ROMAN = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6 };
+    const key = (n) => {
+      const u = n.match(/\bU(\d+)/);
+      if (u) return [1, -Number(u[1]), n];
+      const r = n.replace(/e\.V\./g, '').match(/\b(I{1,3}|IV|VI?)\b/);
+      if (r) return [0, ROMAN[r[1]], n];
+      if (/^SV Vorgebirge$/i.test(n.trim()) || n.split(' ').length <= 2) return [0, 1, n];
+      return [2, 0, n];
+    };
+    return names.sort((a, b) => {
+      const ka = key(a), kb = key(b);
+      for (let i = 0; i < 3; i++) if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
+      return 0;
+    });
+  }
+
+  function init(data) {
+    games = data.games || [];
+    clubName = data.club?.name || clubName;
+    if (data.club?.url) $('#club-link').href = data.club.url;
+
+    const teams = sortTeams([...new Set(games.map((g) => g.ownTeam).filter(Boolean))]);
+    const sel = $('#team');
+    for (const t of teams) {
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = t;
+      sel.appendChild(o);
+    }
+
+    if (data.generatedAt) {
+      const d = new Date(data.generatedAt);
+      $('#updated').textContent = 'Stand: ' + d.toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' }) + ' Uhr';
+    }
+
+    // webcal:// subscription link
+    const icsUrl = new URL('games.ics', location.href);
+    $('#webcal').href = icsUrl.href.replace(/^https?:/, 'webcal:');
+
+    // restore state from URL hash (#team=...&ha=...&range=...)
+    const p = new URLSearchParams(location.hash.slice(1));
+    if (p.get('team') && teams.includes(p.get('team'))) { state.team = p.get('team'); sel.value = state.team; }
+    if (p.get('ha')) { state.ha = p.get('ha'); setHa(state.ha); }
+    if (p.get('range')) { state.range = p.get('range'); $('#range').value = state.range; }
+
+    render();
+  }
+
+  function setHa(v) {
+    document.querySelectorAll('.segmented button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ha === v)));
+  }
+
+  function syncHash() {
+    const p = new URLSearchParams();
+    if (state.team) p.set('team', state.team);
+    if (state.ha) p.set('ha', state.ha);
+    if (state.range !== 'all') p.set('range', state.range);
+    const h = p.toString();
+    history.replaceState(null, '', h ? '#' + h : location.pathname);
+  }
+
+  $('#search').addEventListener('input', (e) => { state.q = e.target.value; render(); });
+  $('#team').addEventListener('change', (e) => { state.team = e.target.value; syncHash(); render(); });
+  $('#range').addEventListener('change', (e) => { state.range = e.target.value; syncHash(); render(); });
+  document.querySelectorAll('.segmented button').forEach((b) => {
+    b.addEventListener('click', () => { state.ha = b.dataset.ha; setHa(state.ha); syncHash(); render(); });
+  });
+
+  fetch('games.json', { cache: 'no-cache' })
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(init)
+    .catch((err) => {
+      list.innerHTML = `<div class="error">Spieldaten konnten nicht geladen werden (${esc(err.message)}).</div>`;
+    });
+})();
+</script>
+</body>
+</html>

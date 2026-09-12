@@ -1,0 +1,14 @@
+{
+  "name": "svvorgebirge-games",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Upcoming games of SV Vorgebirge from fussball.de, published as a static page on GitHub Pages",
+  "scripts": {
+    "fetch": "node scripts/fetch-games.js --out public",
+    "serve": "npm run fetch && npx --yes serve public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
