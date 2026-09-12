@@ -5,20 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SV Vorgebirge – Spielplan</title>
 <meta name="description" content="Alle anstehenden Spiele des SV Vorgebirge 23/25/56 e.V. – Daten von fussball.de">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<meta name="theme-color" content="#0a2974">
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #f4f6f8;
+    /* SV Vorgebirge: navy #0a2974, gold #dabc49 (svvorgebirge.de) */
+    --navy: #0a2974;
+    --gold: #dabc49;
+    --bg: #f3f4f8;
     --card: #ffffff;
-    --text: #1a1d21;
+    --text: #1f2430;
     --muted: #5f6b7a;
-    --line: #e1e5ea;
-    --accent: #0f6b3f;
-    --accent-soft: #e2f3ea;
-    --home: #0f6b3f;
-    --away: #8a5a00;
-    --away-soft: #fff3d6;
+    --line: #dfe3ec;
+    --accent: var(--navy);
+    --accent-soft: #e7ebf7;
+    --header-bg: var(--navy);
+    --header-text: #fafafa;
+    --header-link: var(--gold);
+    --home: var(--navy);
+    --home-soft: #e7ebf7;
+    --away: #7a6210;
+    --away-soft: #f8f1d2;
     --warn: #b23a3a;
     --warn-soft: #fbe5e5;
     --radius: 10px;
@@ -26,18 +35,20 @@
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #101418;
-      --card: #1a2027;
-      --text: #e8ecf0;
-      --muted: #9aa6b3;
-      --line: #2a323c;
-      --accent: #4fc38a;
-      --accent-soft: #143324;
-      --home: #4fc38a;
-      --away: #f0b64a;
-      --away-soft: #3a2e12;
-      --warn: #ff7b7b;
-      --warn-soft: #3c1d1d;
+      --bg: #0b1433;
+      --card: #14204d;
+      --text: #fafafa;
+      --muted: #9eabc4;
+      --line: #25336e;
+      --accent: var(--gold);
+      --accent-soft: #33301a;
+      --header-bg: var(--navy);
+      --home: var(--gold);
+      --home-soft: #33301a;
+      --away: #9eabc4;
+      --away-soft: #1c2a5e;
+      --warn: #ff8b8b;
+      --warn-soft: #4a1f1f;
     }
   }
   * { box-sizing: border-box; }
@@ -52,14 +63,16 @@
   a { color: var(--accent); }
 
   header {
-    background: var(--accent);
-    color: #fff;
-    padding: 18px 16px 14px;
+    background: var(--header-bg);
+    color: var(--header-text);
+    padding: 14px 16px;
+    border-bottom: 3px solid var(--gold);
   }
-  header .wrap { max-width: 960px; margin: 0 auto; }
+  header .wrap { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 14px; }
+  header img { width: 52px; height: 52px; flex-shrink: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
   header h1 { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: .01em; }
-  header p { margin: 4px 0 0; font-size: .85rem; opacity: .9; }
-  header a { color: #fff; }
+  header p { margin: 3px 0 0; font-size: .85rem; opacity: .9; }
+  header a { color: var(--header-link); }
 
   main { max-width: 960px; margin: 0 auto; padding: 14px 12px 60px; }
 
@@ -150,7 +163,7 @@
     text-transform: uppercase;
     padding: 2px 6px;
     border-radius: 999px;
-    background: var(--accent-soft);
+    background: var(--home-soft);
     color: var(--home);
   }
   .badge.away { background: var(--away-soft); color: var(--away); }
@@ -181,8 +194,11 @@
 <body>
 <header>
   <div class="wrap">
-    <h1>⚽ SV Vorgebirge – Spielplan</h1>
+    <img src="logo.png" alt="" width="52" height="52">
+    <div>
+    <h1>SV Vorgebirge – Spielplan</h1>
     <p>Alle anstehenden Spiele des <a id="club-link" href="https://www.fussball.de/verein/-/id/00ES8GN914000083VV0AG08LVUPGND5I" target="_blank" rel="noopener">SV Vorgebirge 23/25/56 e.V.</a> · Daten von fussball.de</p>
+    </div>
   </div>
 </header>
 
