@@ -14,7 +14,7 @@ and deploys the page to GitHub Pages.
 3. `public/index.html` loads `games.json` and renders the games. It has filters
    for team, home/away, date range, and a text search. Colors follow
    svvorgebirge.de (navy `#0a2974`, gold `#dabc49`). `public/logo.png` is the
-   club crest from fussball.de.
+   club crest from svvorgebirge.de.
 
 fussball.de sends no CORS headers. A browser cannot call the endpoint directly.
 This is the reason for the fetch step in GitHub Actions.
