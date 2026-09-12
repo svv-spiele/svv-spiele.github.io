@@ -1,7 +1,7 @@
 # SV Vorgebirge – Spielplan
 
 Static web page that lists all upcoming games of SV Vorgebirge 23/25/56 e.V.
-The data comes from fussball.de. GitHub Actions fetches the data every 6 hours
+The data comes from fussball.de. GitHub Actions fetches the data every 3 hours
 and deploys the page to GitHub Pages.
 
 ## How it works
@@ -22,7 +22,7 @@ This is the reason for the fetch step in GitHub Actions.
 1. Create a new GitHub repository and push this project to the `main` branch.
 2. Open **Settings → Pages**. Set **Source** to **GitHub Actions**.
 3. Open **Actions**, select the workflow, and click **Run workflow** for the first deploy.
-   Later runs start automatically every 6 hours and on each push.
+   Later runs start automatically every 3 hours and on each push.
 
 The page URL is `https://<user>.github.io/<repo>/`.
 

@@ -2,8 +2,8 @@ name: Update games and deploy to GitHub Pages
 
 on:
   schedule:
-    # Every 6 hours (UTC). fussball.de publishes changes during the week.
-    - cron: '17 */6 * * *'
+    # Every 3 hours (UTC). fussball.de publishes changes during the week.
+    - cron: '17 */3 * * *'
   push:
     branches: [main]
   workflow_dispatch:
