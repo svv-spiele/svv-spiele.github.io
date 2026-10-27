@@ -97,6 +97,84 @@
   }
   .toolbar input:focus, .toolbar select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+  /* Team picker: dropdown with one checkbox per team */
+  .teampick { position: relative; }
+  .teampick summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .95rem;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+  }
+  .teampick summary::-webkit-details-marker { display: none; }
+  .teampick summary::after { content: "▾"; margin-left: auto; color: var(--muted); font-size: .8rem; }
+  .teampick[open] summary::after { content: "▴"; }
+  .teampick summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .teampick #team-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .teampick .count-pill {
+    flex-shrink: 0;
+    font-size: .72rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .teampanel {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    min-width: 240px;
+    max-height: min(60vh, 420px);
+    overflow-y: auto;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    padding: 6px;
+  }
+  .teampanel .actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 6px 8px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 4px;
+  }
+  .teampanel .actions button {
+    font: inherit;
+    font-size: .82rem;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 2px 0;
+  }
+  .teampanel .actions button:disabled { color: var(--muted); cursor: default; }
+  .teampanel label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 6px;
+    border-radius: 6px;
+    font-size: .92rem;
+    cursor: pointer;
+  }
+  .teampanel label:hover { background: var(--accent-soft); }
+  .teampanel input[type="checkbox"] { width: 17px; height: 17px; margin: 0; accent-color: var(--navy); flex-shrink: 0; }
+  @media (prefers-color-scheme: dark) {
+    .teampanel input[type="checkbox"] { accent-color: var(--gold); }
+  }
+
   .segmented {
     display: inline-flex;
     border: 1px solid var(--line);
@@ -205,7 +283,16 @@
 <main>
   <div class="toolbar">
     <input id="search" type="search" placeholder="Suche: Gegner, Wettbewerb, Spielort …" autocomplete="off">
-    <select id="team"><option value="">Alle Mannschaften</option></select>
+    <details class="teampick" id="teampick">
+      <summary aria-label="Mannschaften auswählen"><span id="team-label">Alle Mannschaften</span><span class="count-pill" id="team-count" hidden></span></summary>
+      <div class="teampanel" role="group" aria-label="Mannschaften">
+        <div class="actions">
+          <button type="button" id="team-clear" disabled>Alle anzeigen</button>
+          <button type="button" id="team-close">Fertig</button>
+        </div>
+        <div id="team-options"></div>
+      </div>
+    </details>
     <select id="range">
       <option value="7">Nächste 7 Tage</option>
       <option value="14">Nächste 14 Tage</option>
@@ -222,8 +309,8 @@
     </div>
     <div class="links">
       <span id="count"></span>
-      <a id="ics" href="games.ics" download>📅 Kalender (ICS)</a>
-      <a id="webcal" href="#">Abonnieren</a>
+      <a id="ics" href="games.ics" download title="Die angezeigten Spiele als Kalenderdatei herunterladen">📅 Kalender (ICS)</a>
+      <span id="subscribe"><a href="#">Abonnieren</a></span>
       <a href="games.json">JSON</a>
     </div>
   </div>
@@ -235,15 +322,20 @@
   <span id="updated"></span> · Quelle: <a href="https://www.fussball.de" target="_blank" rel="noopener">fussball.de</a> · Angaben ohne Gewähr. Vorläufige Spiele sind gestrichelt markiert.
 </footer>
 
+<script src="ics.js"></script>
 <script>
 (function () {
   'use strict';
 
+  const { filterGames, toIcs, calendarName, shortTeam, slugify, feedPath } = window.SvvGames;
   const $ = (s) => document.querySelector(s);
   const list = $('#list');
-  const state = { q: '', team: '', ha: '', range: 'all' };
+  const picker = $('#teampick');
+  const state = { q: '', teams: [], ha: '', range: 'all' };
   let games = [];
+  let allTeams = [];
   let clubName = 'SV Vorgebirge';
+  let feeds = null;
 
   const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
   const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -310,27 +402,26 @@
       </div>`;
   }
 
-  function filtered() {
-    const q = state.q.trim().toLowerCase();
+  /** The current filter, in the form the shared filter (ics.js) expects. */
+  function currentFilter() {
     const today = todayIso();
-    const until = state.range === 'all' ? null : addDays(today, Number(state.range));
-    return games.filter((g) => {
-      if (g.date < today) return false;
-      if (until && g.date > until) return false;
-      if (state.team && g.ownTeam !== state.team) return false;
-      if (state.ha === 'home' && g.isHome !== true) return false;
-      if (state.ha === 'away' && g.isHome !== false) return false;
-      if (q) {
-        const hay = [g.home?.name, g.away?.name, g.ageGroup, g.competition, g.venue, g.ownTeam].join(' ').toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
+    return {
+      teams: state.teams,
+      ha: state.ha,
+      q: state.q,
+      from: today,
+      until: state.range === 'all' ? null : addDays(today, Number(state.range)),
+    };
+  }
+
+  function filtered() {
+    return filterGames(games, currentFilter());
   }
 
   function render() {
     const rows = filtered();
     $('#count').textContent = `${rows.length} Spiel${rows.length === 1 ? '' : 'e'}`;
+    renderSubscribe();
     if (!rows.length) {
       list.innerHTML = '<div class="empty">Keine Spiele gefunden.</div>';
       return;
@@ -350,6 +441,59 @@
     list.innerHTML = html;
   }
 
+  // ---------- Calendar ----------
+
+  function webcal(rel) {
+    return new URL(rel, location.href).href.replace(/^https?:/, 'webcal:');
+  }
+
+  /**
+   * Subscription links. A subscription needs a fixed URL, so it uses the
+   * feeds that the workflow writes: one per team and home/away choice.
+   * With several teams selected there is one link per team.
+   */
+  function renderSubscribe() {
+    const el = $('#subscribe');
+    const title = 'Kalender abonnieren (aktualisiert sich automatisch). Mannschaft und Heim/Auswärts werden übernommen, Suche und Zeitraum nicht.';
+    if (!feeds) {
+      el.innerHTML = `<a href="${esc(webcal('games.ics'))}" title="${esc(title)}">Abonnieren</a>`;
+      return;
+    }
+    if (!state.teams.length) {
+      el.innerHTML = `<a href="${esc(webcal(feedPath(feeds.all, state.ha)))}" title="${esc(title)}">Abonnieren</a>`;
+      return;
+    }
+    const links = state.teams
+      .filter((t) => feeds.teams[t])
+      .map((t) => ({ t, href: webcal(feedPath(feeds.teams[t], state.ha)) }));
+    if (links.length === 1) {
+      el.innerHTML = `<a href="${esc(links[0].href)}" title="${esc(title)}">Abonnieren</a>`;
+      return;
+    }
+    el.innerHTML = `<span title="${esc(title + ' Ein Abo pro Mannschaft.')}">Abonnieren:</span> ` +
+      links.map(({ t, href }) => `<a href="${esc(href)}" title="${esc(t)} abonnieren">${esc(shortTeam(t, clubName))}</a>`).join(' · ');
+  }
+
+  /** Download the games shown on the page as an .ics file. */
+  function downloadIcs(e) {
+    e.preventDefault();
+    const f = currentFilter();
+    const rows = filtered();
+    const ics = toIcs(rows, calendarName(clubName, f));
+    const name = ['svv-spiele', ...f.teams.map((t) => slugify(shortTeam(t, clubName))), f.ha === 'home' ? 'heim' : f.ha === 'away' ? 'auswaerts' : '']
+      .filter(Boolean).join('-');
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  // ---------- Team picker ----------
+
   function sortTeams(names) {
     // Senior teams first (I, II, III …), then youth by age descending, then the rest.
     const ROMAN = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6 };
@@ -368,35 +512,63 @@
     });
   }
 
+  function buildTeamOptions() {
+    $('#team-options').innerHTML = allTeams
+      .map((t) => `<label><input type="checkbox" value="${esc(t)}"> <span>${esc(t)}</span></label>`)
+      .join('');
+    $('#team-options').querySelectorAll('input').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const checked = new Set([...$('#team-options').querySelectorAll('input:checked')].map((i) => i.value));
+        setTeams(allTeams.filter((t) => checked.has(t)));
+      });
+    });
+  }
+
+  function updateTeamPicker() {
+    const n = state.teams.length;
+    const label = $('#team-label');
+    const pill = $('#team-count');
+    if (!n) label.textContent = 'Alle Mannschaften';
+    else if (n <= 2) label.textContent = state.teams.map((t) => shortTeam(t, clubName)).join(', ');
+    else label.textContent = state.teams.slice(0, 2).map((t) => shortTeam(t, clubName)).join(', ') + ' …';
+    label.title = n ? state.teams.join(', ') : '';
+    pill.hidden = n < 2;
+    pill.textContent = n;
+    $('#team-clear').disabled = !n;
+    $('#team-options').querySelectorAll('input').forEach((cb) => { cb.checked = state.teams.includes(cb.value); });
+  }
+
+  function setTeams(teams) {
+    state.teams = teams;
+    updateTeamPicker();
+    syncHash();
+    render();
+  }
+
+  // ---------- Init ----------
+
   function init(data) {
     games = data.games || [];
     clubName = data.club?.name || clubName;
+    feeds = data.feeds || null;
     if (data.club?.url) $('#club-link').href = data.club.url;
 
-    const teams = sortTeams([...new Set(games.map((g) => g.ownTeam).filter(Boolean))]);
-    const sel = $('#team');
-    for (const t of teams) {
-      const o = document.createElement('option');
-      o.value = t;
-      o.textContent = t;
-      sel.appendChild(o);
-    }
+    allTeams = sortTeams([...new Set(games.map((g) => g.ownTeam).filter(Boolean))]);
+    buildTeamOptions();
 
     if (data.generatedAt) {
       const d = new Date(data.generatedAt);
       $('#updated').textContent = 'Stand: ' + d.toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' }) + ' Uhr';
     }
 
-    // webcal:// subscription link
-    const icsUrl = new URL('games.ics', location.href);
-    $('#webcal').href = icsUrl.href.replace(/^https?:/, 'webcal:');
-
-    // restore state from URL hash (#team=...&ha=...&range=...)
+    // restore state from URL hash (#team=...&team=...&ha=...&range=...)
     const p = new URLSearchParams(location.hash.slice(1));
-    if (p.get('team') && teams.includes(p.get('team'))) { state.team = p.get('team'); sel.value = state.team; }
+    const fromHash = p.getAll('team');
+    state.teams = allTeams.filter((t) => fromHash.includes(t));
     if (p.get('ha')) { state.ha = p.get('ha'); setHa(state.ha); }
     if (p.get('range')) { state.range = p.get('range'); $('#range').value = state.range; }
 
+    updateTeamPicker();
     render();
   }
 
@@ -406,18 +578,24 @@
 
   function syncHash() {
     const p = new URLSearchParams();
-    if (state.team) p.set('team', state.team);
+    for (const t of state.teams) p.append('team', t);
     if (state.ha) p.set('ha', state.ha);
     if (state.range !== 'all') p.set('range', state.range);
     const h = p.toString();
-    history.replaceState(null, '', h ? '#' + h : location.pathname);
+    history.replaceState(null, '', h ? '#' + h : location.pathname + location.search);
   }
 
   $('#search').addEventListener('input', (e) => { state.q = e.target.value; render(); });
-  $('#team').addEventListener('change', (e) => { state.team = e.target.value; syncHash(); render(); });
   $('#range').addEventListener('change', (e) => { state.range = e.target.value; syncHash(); render(); });
   document.querySelectorAll('.segmented button').forEach((b) => {
     b.addEventListener('click', () => { state.ha = b.dataset.ha; setHa(state.ha); syncHash(); render(); });
+  });
+  $('#ics').addEventListener('click', downloadIcs);
+  $('#team-clear').addEventListener('click', () => setTeams([]));
+  $('#team-close').addEventListener('click', () => { picker.open = false; picker.querySelector('summary').focus(); });
+  document.addEventListener('click', (e) => { if (picker.open && !picker.contains(e.target)) picker.open = false; });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && picker.open) { picker.open = false; picker.querySelector('summary').focus(); }
   });
 
   fetch('games.json', { cache: 'no-cache' })

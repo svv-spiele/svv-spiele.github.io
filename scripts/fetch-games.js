@@ -1,17 +1,29 @@
 #!/usr/bin/env node
 /**
- * Fetch upcoming games of a club from fussball.de and write
- * games.json + games.ics into an output directory.
+ * Fetch upcoming games of a club from fussball.de and write into an output directory:
+ *   games.json              all games
+ *   games.ics               all games (kept for existing subscriptions)
+ *   cal/alle[-heim|-auswaerts].ics
+ *   cal/<team>[-heim|-auswaerts].ics   one feed per own team and home/away choice
  *
  * Usage:
- *   node scripts/fetch-games.js [--club <id>] [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+ *   node scripts/fetch-games.js [--club <id>] [--name <club name>]
+ *                               [--from YYYY-MM-DD] [--to YYYY-MM-DD]
  *                               [--months <n>] [--out <dir>]
+ *                               [--html <file>] [--allow-empty]
+ *
+ * --html <file>   parse a saved fussball.de HTML fragment instead of fetching
+ * --allow-empty   do not fail when no games are found
+ *
+ * Exits with code 1 when no games are found, so a broken fetch or a changed
+ * page layout fails the workflow instead of publishing an empty schedule.
  *
  * No dependencies. Requires Node.js >= 18 (global fetch).
  */
 
 const fs = require('fs');
 const path = require('path');
+const { filterGames, calendarName, slugify, feedPath, toIcs } = require('../public/ics.js');
 
 const DEFAULT_CLUB_ID = '00ES8GN914000083VV0AG08LVUPGND5I'; // SV Vorgebirge 23/25/56 e.V.
 const DEFAULT_CLUB_NAME = 'SV Vorgebirge';
@@ -19,6 +31,8 @@ const BASE = 'https://www.fussball.de';
 const PAGE_SIZE = 500;
 const USER_AGENT = 'Mozilla/5.0 (compatible; svvorgebirge-games/1.0; +https://github.com)';
 const TZ = 'Europe/Berlin';
+const FEED_DIR = 'cal';
+const HA_CHOICES = ['', 'home', 'away'];
 
 // ---------- CLI ----------
 
@@ -151,93 +165,48 @@ function parseGames(html, clubName) {
   return games;
 }
 
-// ---------- ICS ----------
+// ---------- Calendar feeds ----------
 
-function icsEscape(s) {
-  return String(s ?? '')
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n');
+/**
+ * Base paths (without "-heim"/"-auswaerts" and ".ics") of the subscription
+ * feeds: one for all games and one per own team. Team slugs are made unique.
+ */
+function feedBases(games) {
+  const teams = [...new Set(games.map((g) => g.ownTeam).filter(Boolean))].sort();
+  const used = new Set(['alle']);
+  const byTeam = {};
+  for (const t of teams) {
+    const base = slugify(t);
+    let slug = base;
+    for (let i = 2; used.has(slug); i++) slug = `${base}-${i}`;
+    used.add(slug);
+    byTeam[t] = `${FEED_DIR}/${slug}`;
+  }
+  return { all: `${FEED_DIR}/alle`, teams: byTeam };
 }
 
-function foldLine(line) {
-  // RFC 5545: lines longer than 75 octets are folded.
-  const out = [];
-  let s = line;
-  while (Buffer.byteLength(s, 'utf8') > 75) {
-    let cut = 75;
-    while (Buffer.byteLength(s.slice(0, cut), 'utf8') > 75) cut--;
-    out.push(s.slice(0, cut));
-    s = ' ' + s.slice(cut);
-  }
-  out.push(s);
-  return out.join('\r\n');
-}
+/** Write all feeds. Returns the list of written paths (relative to outDir). */
+function writeFeeds(outDir, games, clubName, feeds, now) {
+  const dir = path.join(outDir, FEED_DIR);
+  fs.rmSync(dir, { recursive: true, force: true }); // drop feeds of teams that are gone
+  fs.mkdirSync(dir, { recursive: true });
 
-const VTIMEZONE = [
-  'BEGIN:VTIMEZONE',
-  'TZID:Europe/Berlin',
-  'BEGIN:DAYLIGHT',
-  'TZOFFSETFROM:+0100',
-  'TZOFFSETTO:+0200',
-  'TZNAME:CEST',
-  'DTSTART:19700329T020000',
-  'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU',
-  'END:DAYLIGHT',
-  'BEGIN:STANDARD',
-  'TZOFFSETFROM:+0200',
-  'TZOFFSETTO:+0100',
-  'TZNAME:CET',
-  'DTSTART:19701025T030000',
-  'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU',
-  'END:STANDARD',
-  'END:VTIMEZONE',
-];
+  const written = [];
+  const write = (rel, filter) => {
+    const ics = toIcs(filterGames(games, filter), calendarName(clubName, filter), now);
+    fs.writeFileSync(path.join(outDir, rel), ics);
+    written.push(rel);
+  };
 
-function toIcs(games, calName) {
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//svvorgebirge-games//fussball.de//DE',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${icsEscape(calName)}`,
-    `X-WR-TIMEZONE:${TZ}`,
-    ...VTIMEZONE,
-  ];
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  for (const g of games) {
-    const ymd = g.date.replace(/-/g, '');
-    const [h, mi] = g.time.split(':').map(Number);
-    const endMin = h * 60 + mi + 120;
-    const start = `${ymd}T${g.time.replace(':', '')}00`;
-    const end = `${ymd}T${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}${String(endMin % 60).padStart(2, '0')}00`;
-    const summary = `${g.home?.name ?? '?'} : ${g.away?.name ?? '?'}`;
-    const desc = [
-      `${g.ageGroup} | ${g.competition}`,
-      g.matchType ? `${g.matchType} | ${g.matchNumber}` : null,
-      g.gameUrl,
-    ]
-      .filter(Boolean)
-      .join('\n');
-    lines.push(
-      'BEGIN:VEVENT',
-      `UID:${g.gameId || `${g.date}-${g.time}-${g.home?.teamId}`}@fussball.de`,
-      `DTSTAMP:${stamp}`,
-      `DTSTART;TZID=${TZ}:${start}`,
-      `DTEND;TZID=${TZ}:${end}`,
-      `SUMMARY:${icsEscape(summary)}`,
-      `DESCRIPTION:${icsEscape(desc)}`,
-      g.venue ? `LOCATION:${icsEscape(g.venue)}` : null,
-      g.gameUrl ? `URL:${g.gameUrl}` : null,
-      `CATEGORIES:${icsEscape(g.ageGroup)}`,
-      g.preliminary ? 'STATUS:TENTATIVE' : 'STATUS:CONFIRMED',
-      'END:VEVENT',
-    );
+  for (const ha of HA_CHOICES) {
+    write(feedPath(feeds.all, ha), { teams: [], ha });
+    for (const [team, base] of Object.entries(feeds.teams)) {
+      write(feedPath(base, ha), { teams: [team], ha });
+    }
   }
-  lines.push('END:VCALENDAR');
-  return lines.filter(Boolean).map(foldLine).join('\r\n') + '\r\n';
+  // Old URL, kept so that existing subscriptions keep working.
+  write('games.ics', { teams: [], ha: '' });
+  return written;
 }
 
 // ---------- Main ----------
@@ -250,26 +219,44 @@ async function main() {
   const to = args.to || addMonths(from, Number(args.months || 12));
   const outDir = args.out || path.join(__dirname, '..', 'public');
 
-  const html = await fetchAllHtml(clubId, from, to);
+  const html = args.html ? fs.readFileSync(args.html, 'utf8') : await fetchAllHtml(clubId, from, to);
   const games = parseGames(html, clubName);
+
+  if (!games.length && !args['allow-empty']) {
+    const reason = html.trim()
+      ? `fussball.de returned ${html.length} bytes of HTML, but no game could be parsed. The page layout may have changed.`
+      : 'fussball.de returned no games.';
+    // "::error::" shows up as an annotation in the GitHub Actions run summary.
+    console.error(`::error::No games found for club ${clubId} (${from} .. ${to}). ${reason}`);
+    console.error('Nothing was written. Use --allow-empty to write an empty schedule anyway.');
+    process.exitCode = 1;
+    return;
+  }
 
   fs.mkdirSync(outDir, { recursive: true });
 
+  const now = new Date();
+  const feeds = feedBases(games);
   const json = {
     club: { id: clubId, name: clubName, url: `${BASE}/verein/-/id/${clubId}` },
-    generatedAt: new Date().toISOString(),
+    generatedAt: now.toISOString(),
     from,
     to,
     count: games.length,
+    feeds,
     games,
   };
   fs.writeFileSync(path.join(outDir, 'games.json'), JSON.stringify(json, null, 2) + '\n');
-  fs.writeFileSync(path.join(outDir, 'games.ics'), toIcs(games, `${clubName} Spiele`));
+  const written = writeFeeds(outDir, games, clubName, feeds, now);
 
-  console.log(`Wrote ${games.length} games (${from} .. ${to}) to ${outDir}`);
+  console.log(`Wrote ${games.length} games (${from} .. ${to}) and ${written.length} calendar files to ${outDir}`);
 }
 
-main().catch((err) => {
-  console.error(err.stack || err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err.stack || err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { parseGames, feedBases, writeFeeds };

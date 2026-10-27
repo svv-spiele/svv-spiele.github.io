@@ -27,6 +27,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Test
+        run: npm test
+
+      # Fails when no games are found. The deploy job is then skipped, the last
+      # good version stays online, and GitHub sends a failure notification.
       - name: Fetch games from fussball.de
         run: node scripts/fetch-games.js --out public
 

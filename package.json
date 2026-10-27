@@ -5,6 +5,7 @@
   "description": "Upcoming games of SV Vorgebirge from fussball.de, published as a static page on GitHub Pages",
   "scripts": {
     "fetch": "node scripts/fetch-games.js --out public",
+    "test": "node --test",
     "serve": "npm run fetch && npx --yes serve public"
   },
   "engines": {
